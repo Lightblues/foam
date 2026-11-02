@@ -38,7 +38,9 @@ export default class VsCodeBasedParserCache implements ParserCache {
   // multi-line paragraph hashtags) — cached ranges must be recomputed
   // v7: Section.headingRange added
   // v8: Resource.tasks added
-  static CACHE_VERSION = 8;
+  // v9: tag columns on indented continuation lines (list indent, blockquote
+  // markers, and a line that ends early at emphasis or a link)
+  static CACHE_VERSION = 9;
   static CACHE_VERSION_KEY = 'foam-cache-version';
   static CACHE_DIR_NAME = 'parser-cache';
   static BUCKET_COUNT = 64;

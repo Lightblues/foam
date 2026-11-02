@@ -531,6 +531,34 @@ tags: hello, world
       ]);
     });
 
+    it('places tags on indented list continuation lines at their source columns', () => {
+      const note = createNoteFromMarkdown(
+        '- item [gh](https://example.com) "quote"\n  #s2 #remark text'
+      );
+      expect(note.tags).toEqual([
+        { label: 's2', range: Range.create(1, 2, 1, 5) },
+        { label: 'remark', range: Range.create(1, 6, 1, 13) },
+      ]);
+    });
+
+    it('places tags on blockquote continuation lines at their source columns', () => {
+      const note = createNoteFromMarkdown('> first #one\n> second #two');
+      expect(note.tags).toEqual([
+        { label: 'one', range: Range.create(0, 8, 0, 12) },
+        { label: 'two', range: Range.create(1, 9, 1, 13) },
+      ]);
+    });
+
+    it('places tags on a continuation line that ends before emphasis', () => {
+      const note = createNoteFromMarkdown(
+        '- item\n  #s4 #remark keep *emphasis* after'
+      );
+      expect(note.tags).toEqual([
+        { label: 's4', range: Range.create(1, 2, 1, 5) },
+        { label: 'remark', range: Range.create(1, 6, 1, 13) },
+      ]);
+    });
+
     it('computes the range of a frontmatter tag that is a substring of another tag', () => {
       const noteA = createNoteFromMarkdown(`---
 tags: [foobar, foo]

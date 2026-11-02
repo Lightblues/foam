@@ -372,6 +372,27 @@ function getPropertiesInfoFromYAML(yamlText: string): {
 const TAG_LABEL_CHAR = /[\p{L}\p{Extended_Pictographic}\p{N}/_-]/u;
 
 /**
+ * Column of a tag that sits on a continuation line of a text node.
+ *
+ * remark's `value` is not a raw slice of that source line. It drops the
+ * list-continuation indent and a blockquote's `> `, and it ends early when
+ * the line continues into emphasis or a link. The value's line is one
+ * contiguous piece of the source line, so its column is where that piece
+ * starts, plus the column inside the piece.
+ */
+const sourceColumnOnContinuationLine = (
+  sourceLine: string,
+  valueLine: string,
+  columnInValue: number
+): number => {
+  if (valueLine.length === 0) {
+    return columnInValue;
+  }
+  const at = sourceLine.indexOf(valueLine);
+  return at >= 0 ? at + columnInValue : columnInValue;
+};
+
+/**
  * Finds the column of `tag` in `line`, matching only occurrences that are not
  * part of a longer tag-like word (so tag `foo` does not match inside `foobar`)
  */
@@ -425,28 +446,38 @@ const tagsPlugin: ParserPlugin = {
       }
     }
   },
-  visit: (node, note) => {
+  visit: (node, note, noteSource) => {
     if (node.type === 'text') {
       const text = (node as any).value as string;
       const tags = extractHashtags(text);
+      const sourceLines = noteSource.split(/\r?\n/);
       for (const tag of tags) {
         // The node's value can span multiple lines (soft breaks), so the
-        // tag's position is derived by counting newlines up to its offset
+        // tag's position is derived by counting newlines up to its offset.
+        // Continuation lines then have to be mapped back onto the source,
+        // because remark omits the list indent and blockquote marker there.
         const nodeStart = astPointToFoamPosition(node.position!.start);
         const preceding = text.slice(0, tag.offset);
         const lastBreak = preceding.lastIndexOf('\n');
         const lineBreaks =
           lastBreak < 0 ? 0 : preceding.split('\n').length - 1;
-        const start: Position = {
-          line: nodeStart.line + lineBreaks,
-          character:
-            lastBreak < 0
-              ? nodeStart.character + tag.offset
-              : tag.offset - lastBreak - 1,
-        };
+        const line = nodeStart.line + lineBreaks;
+        let character = nodeStart.character + tag.offset;
+        if (lastBreak >= 0) {
+          const valueLineEnd = text.indexOf('\n', tag.offset);
+          character = sourceColumnOnContinuationLine(
+            sourceLines[line] ?? '',
+            text.slice(
+              lastBreak + 1,
+              valueLineEnd === -1 ? text.length : valueLineEnd
+            ),
+            tag.offset - lastBreak - 1
+          );
+        }
+        const start: Position = { line, character };
         const end: Position = {
-          line: start.line,
-          character: start.character + tag.label.length + 1,
+          line,
+          character: character + tag.label.length + 1,
         };
         note.tags.push({
           label: tag.label,
