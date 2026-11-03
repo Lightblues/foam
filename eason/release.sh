@@ -19,11 +19,12 @@ $YARN install --frozen-lockfile --ignore-scripts
 
 # Upstream raises engines.vscode to its newest test version; the extension itself runs on older
 # editors. Lower the floor only for the packaged build (restored afterwards, so merges stay clean).
+# vsce also requires @types/vscode <= engines, so that field is lowered in the same temporary edit.
 # Override with ENGINE_MIN=^1.136.0 to keep the upstream value.
 ENGINE_MIN="${ENGINE_MIN:-^1.110.0}"
 PKG=packages/foam-vscode/package.json
 trap 'git checkout -q -- "$PKG"' EXIT
-node -e "const f=\"$PKG\",fs=require(\"fs\"),p=JSON.parse(fs.readFileSync(f));p.engines.vscode=\"$ENGINE_MIN\";fs.writeFileSync(f,JSON.stringify(p,null,2)+\"\\n\")"
+node -e "const f=\"$PKG\",fs=require(\"fs\"),p=JSON.parse(fs.readFileSync(f));p.engines.vscode=\"$ENGINE_MIN\";p.devDependencies[\"@types/vscode\"]=\"$ENGINE_MIN\";fs.writeFileSync(f,JSON.stringify(p,null,2)+\"\\n\")"
 (cd packages/foam-vscode && $YARN build && $YARN package)
 git checkout -q -- "$PKG"
 
