@@ -26,15 +26,16 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$WANT" ] || WANT="code cursor"
 
-if [ -n "$TAG" ]; then
-  api="https://api.github.com/repos/$REPO/releases/tags/$TAG"
-else
-  api="https://api.github.com/repos/$REPO/releases/latest"
+# Resolve the tag without the REST API (it is rate limited to 60 requests/hour per IP):
+# /releases/latest redirects to /releases/tag/<tag>, and the asset is foam-vscode-<version>.vsix.
+if [ -z "$TAG" ]; then
+  loc="$(curl -fsSI -o /dev/null -w '%{url_effective}' -L "https://github.com/$REPO/releases/latest")"
+  TAG="${loc##*/}"
 fi
-json="$(curl -fsSL "$api")"
-url="$(printf '%s' "$json" | grep -o '"browser_download_url": *"[^"]*\.vsix"' | head -1 | sed 's/.*": *"//; s/"$//')"
-tag="$(printf '%s' "$json" | grep -o '"tag_name": *"[^"]*"' | head -1 | sed 's/.*": *"//; s/"$//')"
-[ -n "$url" ] || { echo "no .vsix asset in release ${TAG:-latest} of $REPO" >&2; exit 1; }
+case "$TAG" in v[0-9]*) ;; *) echo "cannot resolve a release tag of $REPO (got '$TAG')" >&2; exit 1 ;; esac
+tag="$TAG"
+ver="${tag#v}"; ver="${ver%%-eason*}"
+url="https://github.com/$REPO/releases/download/$tag/foam-vscode-$ver.vsix"
 
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 vsix="$tmp/$(basename "$url")"
