@@ -16,7 +16,16 @@ YARN="npx --yes yarn@1.22.22"
 
 $YARN install --frozen-lockfile --ignore-scripts
 (cd packages/foam-core && $YARN build)
+
+# Upstream raises engines.vscode to its newest test version; the extension itself runs on older
+# editors. Lower the floor only for the packaged build (restored afterwards, so merges stay clean).
+# Override with ENGINE_MIN=^1.136.0 to keep the upstream value.
+ENGINE_MIN="${ENGINE_MIN:-^1.110.0}"
+PKG=packages/foam-vscode/package.json
+trap 'git checkout -q -- "$PKG"' EXIT
+node -e "const f=\"$PKG\",fs=require(\"fs\"),p=JSON.parse(fs.readFileSync(f));p.engines.vscode=\"$ENGINE_MIN\";fs.writeFileSync(f,JSON.stringify(p,null,2)+\"\\n\")"
 (cd packages/foam-vscode && $YARN build && $YARN package)
+git checkout -q -- "$PKG"
 
 ver="$(node -p "require('./packages/foam-vscode/package.json').version")"
 vsix="packages/foam-vscode/foam-vscode-$ver.vsix"
